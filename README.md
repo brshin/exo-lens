@@ -1,47 +1,52 @@
 # ExoScope
 
-Explore how the masses and orbital periods of confirmed exoplanets relate in an
-interactive, searchable dashboard powered by the NASA Exoplanet Archive.
+Interactive explorer for confirmed exoplanets on a log–log mass × orbital-period
+chart, backed by a weekly NASA catalog snapshot and a constrained AI readout.
 
-**[Open the live dashboard →](https://exoplanet-analytics.vercel.app/)**
+**[Open the live app →](https://exoplanet-analytics.vercel.app/)**
 
-> The API is hosted on Render's free tier, so the first load can take a moment
-> while a sleeping instance wakes up.
+> The API runs on Render’s free tier. The first request after idle can take a
+> few seconds while the instance wakes up.
 
 ![ExoScope desktop dashboard with Kepler-22 b selected](docs/exoplanet-analytics-desktop.jpg)
 
-## What you can do
+## What it does
 
-- Explore 6,000+ confirmed planets on a log–log mass-versus-period chart.
-- Hover over any point to identify a planet; use Zoom or Pan when the field is dense.
-- Click a point or search by name to inspect its mass and orbital period.
-- Generate a concise AI interpretation based only on those two measured values.
-- Work from a catalog refreshed automatically from NASA each week.
+- Plot **6,000+** confirmed planets from the NASA Exoplanet Archive
+- Search or click a planet to inspect mass (Earth masses) and orbital period (days)
+- Zoom / pan a dense log–log field with Earth and Jupiter as reference anchors
+- Generate a short AI interpretation from **only** those two measured values
 
-AI interpretations are speculative, educational summaries—not scientific
-assessments. They do not infer temperature, atmosphere, climate, host-star
-properties, or habitability.
+AI output is an educational summary, not a scientific assessment. The prompt
+forbids temperature, atmosphere, climate, host-star, and habitability claims.
 
-## How it works
+## Design decisions
+
+These are the choices the project is built around:
+
+| Choice | Why |
+| --- | --- |
+| Checked-in `planets.json` snapshot | Chart loads stay fast and offline-from-NASA. Request path never depends on TAP latency. |
+| Weekly GitHub Actions refresh | Catalog freshness without coupling UX to a live upstream query. |
+| AI limited to mass + period | Prevents the model from inventing properties the UI did not supply. |
+| OpenAI key only on the API | Browser never sees the secret; frontend only posts a planet name. |
+| In-memory rate limit (15/IP/hour) | Cheap guard for a small public demo—not distributed rate limiting. |
+
+## Architecture
 
 ```text
-NASA Exoplanet Archive
+NASA Exoplanet Archive (pscomppars)
           │
-          │ weekly TAP query
+          │ weekly TAP query (GitHub Actions)
           ▼
-refresh_planets.py ── clean and deduplicate ──► api/planets.json
-                                                       │
-React + Plotly ◄──────── GET /planets ─────────── FastAPI
-      │                                                │
-      └─────────────── POST /analyze ──────────────────┤
-                                                       ▼
-                                              OpenAI GPT-4o mini
+refresh_planets.py ── clean + dedupe ──► api/planets.json
+                                                │
+React + Plotly ◄──────── GET /planets ──── FastAPI (mtime-cached)
+      │                                       │
+      └────────────── POST /analyze ──────────┤
+                                              ▼
+                                     OpenAI GPT-4o mini
 ```
-
-The chart reads a checked-in JSON snapshot rather than querying NASA during a
-request. This keeps exploration fast and available even when the upstream
-archive is slow. The OpenAI key stays in the API; it is never exposed to the
-browser.
 
 ### Stack
 
@@ -50,20 +55,15 @@ browser.
 | Frontend | React 19, Vite, Plotly.js |
 | API | FastAPI, pandas |
 | AI | OpenAI GPT-4o mini |
-| Data pipeline | NASA TAP API, requests, pandas, GitHub Actions |
-| Hosting | Vercel frontend, Render API |
+| Pipeline | NASA TAP, requests, pandas, GitHub Actions |
+| Hosting | Vercel (frontend), Render (API) |
 
 ## Run locally
 
-### Prerequisites
+**Prerequisites:** Python 3.13, Node.js 22, and an OpenAI API key only if you
+want AI interpretation.
 
-- Python 3.13
-- Node.js 22
-- An OpenAI API key if you want to use AI analysis
-
-### 1. Start the API
-
-From the repository root:
+### 1. API
 
 ```bash
 python3.13 -m venv .venv
@@ -73,17 +73,13 @@ cp api/.env.example api/.env
 uvicorn api.main:app --reload --reload-dir api --port 8000
 ```
 
-The catalog and interactive API docs are then available at:
+- Catalog: `http://localhost:8000/planets`
+- Docs: `http://localhost:8000/docs`
 
-- `http://localhost:8000/planets`
-- `http://localhost:8000/docs`
+The chart works without `OPENAI_API_KEY`. Set it in `api/.env` to enable
+**Generate interpretation**.
 
-The chart works without an OpenAI key. To enable **Generate interpretation**, set
-`OPENAI_API_KEY` in `api/.env`.
-
-### 2. Start the frontend
-
-In a second terminal:
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -91,32 +87,28 @@ npm ci
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). In local development, Vite
-proxies `/planets` and `/analyze` to the API, so `VITE_API_URL` can stay unset.
+Open [http://localhost:5173](http://localhost:5173). Local Vite proxies
+`/planets` and `/analyze`, so `VITE_API_URL` can stay unset.
 
 ## Configuration
 
 | Variable | Used by | Default | Purpose |
 | --- | --- | --- | --- |
-| `OPENAI_API_KEY` | API | unset | Enables the `/analyze` endpoint |
-| `CORS_ORIGINS` | API | local Vite origins | Comma-separated browser origins allowed to call the API |
-| `VITE_API_URL` | Frontend | unset in local dev (Vite proxy) | Public FastAPI origin, embedded when Vite builds |
-
-Copy the included examples when you need to override a default:
+| `OPENAI_API_KEY` | API | unset | Enables `/analyze` |
+| `CORS_ORIGINS` | API | local Vite origins | Allowed browser origins |
+| `VITE_API_URL` | Frontend | unset in local dev | Public API origin, baked in at build time |
 
 ```bash
 cp api/.env.example api/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Never put `OPENAI_API_KEY` in the frontend environment. Variables prefixed with
-`VITE_` are shipped to the browser.
+Never put `OPENAI_API_KEY` in the frontend. `VITE_` variables are shipped to
+the browser.
 
 ## API
 
 ### `GET /planets`
-
-Returns the cleaned catalog:
 
 ```json
 [
@@ -131,81 +123,71 @@ Returns the cleaned catalog:
 ### `POST /analyze`
 
 ```json
-{
-  "selectedPlanet": "11 Com b"
-}
+{ "selectedPlanet": "11 Com b" }
 ```
 
-Returns a two-sentence mass and orbit interpretation. Requests are limited to
-15 per IP address per rolling hour. The current limiter is in memory and is
-intended to protect this small public deployment, not to provide distributed
-rate limiting.
+Returns a two-sentence mass and orbit interpretation. Limited to 15 requests
+per IP per rolling hour (in-memory; process-local).
 
 ## Data
 
-The refresh script queries the
-[Planetary Systems Composite Parameters (`pscomppars`)](https://exoplanetarchive.ipac.caltech.edu/docs/API_PSCompPars_columns.html)
-table:
+Refresh queries NASA’s
+[Planetary Systems Composite Parameters (`pscomppars`)](https://exoplanetarchive.ipac.caltech.edu/docs/API_PSCompPars_columns.html):
 
 ```sql
 SELECT pl_name, pl_bmasse, pl_orbper
 FROM pscomppars
 ```
 
-- `pl_name`: planet name
-- `pl_bmasse`: planetary mass or mass × sin(i), in Earth masses
-- `pl_orbper`: orbital period, in days
+| Field | Meaning |
+| --- | --- |
+| `pl_name` | Planet name |
+| `pl_bmasse` | Mass or mass × sin(i), Earth masses |
+| `pl_orbper` | Orbital period, days |
 
-`pscomppars` provides one composite row per planet and chooses the best
-available reference independently for each field. A planet's mass and period
-can therefore come from different publications.
-
-To refresh the snapshot manually:
+`pscomppars` stores one composite row per planet and can pick the best
+reference **independently per field**, so a planet’s mass and period may come
+from different publications. The refresh script drops rows missing mass or
+period and deduplicates by name into `api/planets.json`.
 
 ```bash
 source .venv/bin/activate
 python scripts/refresh_planets.py
 ```
 
-The script removes records without a mass or period, deduplicates by planet
-name, and writes `api/planets.json`. The
-[scheduled workflow](.github/workflows/refresh-planets.yml) runs the same
-process every Monday at 16:00 UTC and commits changes when NASA's catalog has
-updated.
+The [scheduled workflow](.github/workflows/refresh-planets.yml) runs Mondays at
+16:00 UTC and commits when the catalog changes.
 
 ## Project structure
 
 ```text
 api/
-├── main.py                 # FastAPI routes, catalog cache, and OpenAI call
-├── planets.json            # generated catalog snapshot
+├── main.py                 # routes, catalog cache, OpenAI call, rate limit
+├── planets.json            # generated snapshot
 └── requirements.txt
 frontend/
-├── src/                    # React dashboard and styles
+├── src/                    # React UI + Plotly chart
 └── package.json
 docs/
 └── exoplanet-analytics-desktop.jpg
 scripts/
-└── refresh_planets.py      # NASA catalog ingestion
+└── refresh_planets.py      # NASA TAP ingestion
 .github/workflows/
-└── refresh-planets.yml     # weekly catalog refresh
+└── refresh-planets.yml     # weekly refresh
 ```
 
-## Production deployment
-
-The deployed frontend expects these values:
+## Production
 
 | Service | Variable | Value |
 | --- | --- | --- |
-| Render | `OPENAI_API_KEY` | Your server-side secret |
+| Render | `OPENAI_API_KEY` | Server-side secret |
 | Render | `CORS_ORIGINS` | `https://exoplanet-analytics.vercel.app` |
 | Vercel | `VITE_API_URL` | `https://exoplanet-api-rpsl.onrender.com` |
 
-Set `VITE_API_URL` before building the frontend because Vite embeds it at build
-time.
+Set `VITE_API_URL` before the frontend build—Vite embeds it at build time.
 
 ## Data credit
 
-Catalog data comes from the
+Catalog data from the
 [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/), operated
-by the California Institute of Technology under contract with NASA.
+by Caltech under contract with NASA.
