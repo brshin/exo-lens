@@ -3,7 +3,7 @@
 Interactive explorer for confirmed exoplanets on a log–log mass × orbital-period
 chart, backed by a weekly NASA catalog snapshot and a constrained AI readout.
 
-**[Open the live app →](https://exoplanet-analytics.vercel.app/)**
+**[Open the live app →](https://exoplanet-lens.vercel.app/)**
 
 > The API runs on Render’s free tier. The first request after idle can take a
 > few seconds while the instance wakes up.
@@ -181,7 +181,7 @@ scripts/
 | Service | Variable | Value |
 | --- | --- | --- |
 | Render | `OPENAI_API_KEY` | Server-side secret |
-| Render | `CORS_ORIGINS` | `https://exoplanet-analytics.vercel.app` |
+| Render | `CORS_ORIGINS` | `https://exoplanet-lens.vercel.app` |
 | Vercel | `VITE_API_URL` | `https://exoplanet-api-rpsl.onrender.com` |
 
 Set `VITE_API_URL` before the frontend build—Vite embeds it at build time.
