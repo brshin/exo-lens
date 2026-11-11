@@ -1,4 +1,4 @@
-# ExoScope
+# ExoLens
 
 Interactive explorer for confirmed exoplanets on a log–log mass × orbital-period
 chart, backed by a weekly NASA catalog snapshot and a constrained AI readout.
@@ -8,7 +8,7 @@ chart, backed by a weekly NASA catalog snapshot and a constrained AI readout.
 > The API runs on Render’s free tier. The first request after idle can take a
 > few seconds while the instance wakes up.
 
-![ExoScope desktop dashboard with Kepler-22 b selected](docs/exoplanet-analytics-desktop.jpg)
+![ExoLens desktop dashboard with Kepler-22 b selected](docs/exoplanet-analytics-desktop.jpg)
 
 ## What it does
 
