@@ -203,11 +203,11 @@ function App() {
       <div className="ambient-orbit ambient-orbit-two" aria-hidden="true" />
 
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Exoplanet Analytics home">
+        <a className="brand" href="/" aria-label="ExoScope home">
           <span className="brand-mark" aria-hidden="true">
             <span />
           </span>
-          <span>Exoplanet Analytics</span>
+          <span>ExoScope</span>
         </a>
 
         <div className="planet-picker">

@@ -1,4 +1,4 @@
-# Exoplanet Analytics
+# ExoScope
 
 Explore how the masses and orbital periods of confirmed exoplanets relate in an
 interactive, searchable dashboard powered by the NASA Exoplanet Archive.
@@ -8,7 +8,7 @@ interactive, searchable dashboard powered by the NASA Exoplanet Archive.
 > The API is hosted on Render's free tier, so the first load can take a moment
 > while a sleeping instance wakes up.
 
-![Exoplanet Analytics desktop dashboard with Kepler-22 b selected](docs/exoplanet-analytics-desktop.jpg)
+![ExoScope desktop dashboard with Kepler-22 b selected](docs/exoplanet-analytics-desktop.jpg)
 
 ## What you can do
 
